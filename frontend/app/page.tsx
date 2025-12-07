@@ -50,8 +50,15 @@ export default function Home() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Conversion failed')
+        let errorMessage = 'Conversion failed'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.detail || errorMessage
+        } catch {
+          // Response might not be JSON (e.g., CORS error or empty response)
+          errorMessage = `Server error: ${response.status} ${response.statusText}`
+        }
+        throw new Error(errorMessage)
       }
 
       const blob = await response.blob()
