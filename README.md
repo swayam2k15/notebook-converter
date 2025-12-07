@@ -2,6 +2,8 @@
 
 A web application to convert Jupyter notebooks (`.ipynb`) to HTML and PDF formats. Built with a modern tech stack featuring a Next.js frontend and FastAPI backend.
 
+**Live Demo:** [https://notebook-converter.vercel.app/](https://notebook-converter.vercel.app/)
+
 ## Features
 
 - Drag-and-drop file upload
