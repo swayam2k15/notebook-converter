@@ -1,19 +1,49 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { FileText, Upload, Download, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
+import { FileText, Upload, Download, Loader2, AlertCircle, CheckCircle, Zap } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 type ConversionFormat = 'html' | 'pdf'
 type ConversionStatus = 'idle' | 'uploading' | 'success' | 'error'
+type BackendStatus = 'unknown' | 'warming' | 'ready' | 'error'
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null)
   const [format, setFormat] = useState<ConversionFormat>('html')
   const [status, setStatus] = useState<ConversionStatus>('idle')
   const [error, setError] = useState<string>('')
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>('unknown')
+  const [warmupTime, setWarmupTime] = useState<number | null>(null)
+
+  const warmUpBackend = async () => {
+    setBackendStatus('warming')
+    setWarmupTime(null)
+    const startTime = Date.now()
+
+    try {
+      const response = await fetch(`${API_URL}/health`, {
+        method: 'GET',
+      })
+
+      if (response.ok) {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+        setWarmupTime(parseFloat(elapsed))
+        setBackendStatus('ready')
+      } else {
+        setBackendStatus('error')
+      }
+    } catch {
+      setBackendStatus('error')
+    }
+  }
+
+  // Auto-check backend status on mount
+  useEffect(() => {
+    warmUpBackend()
+  }, [])
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const uploadedFile = acceptedFiles[0]
@@ -98,6 +128,62 @@ export default function Home() {
             Convert your Jupyter notebooks to HTML or PDF format
           </p>
         </div>
+
+        {/* Backend Status Indicator */}
+        <div className="mb-4 flex items-center justify-center gap-2">
+          <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border border-gray-200">
+            {/* Status Light */}
+            <div className="relative">
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  backendStatus === 'ready'
+                    ? 'bg-green-500'
+                    : backendStatus === 'warming'
+                    ? 'bg-yellow-500'
+                    : backendStatus === 'error'
+                    ? 'bg-red-500'
+                    : 'bg-gray-400'
+                }`}
+              />
+              {backendStatus === 'warming' && (
+                <div className="absolute inset-0 w-3 h-3 rounded-full bg-yellow-500 animate-ping" />
+              )}
+              {backendStatus === 'ready' && (
+                <div className="absolute inset-0 w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+              )}
+            </div>
+
+            {/* Status Text */}
+            <span className="text-sm text-gray-600">
+              {backendStatus === 'ready' && (
+                <>Server ready {warmupTime !== null && <span className="text-gray-400">({warmupTime}s)</span>}</>
+              )}
+              {backendStatus === 'warming' && 'Warming up server...'}
+              {backendStatus === 'error' && 'Server unavailable'}
+              {backendStatus === 'unknown' && 'Checking server...'}
+            </span>
+
+            {/* Warm Up Button */}
+            {(backendStatus === 'error' || backendStatus === 'unknown') && (
+              <button
+                onClick={warmUpBackend}
+                className="ml-2 p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                title="Wake up server"
+              >
+                <Zap className="w-4 h-4" />
+              </button>
+            )}
+
+            {backendStatus === 'warming' && (
+              <Loader2 className="w-4 h-4 text-yellow-600 animate-spin ml-1" />
+            )}
+          </div>
+        </div>
+        {backendStatus === 'warming' && (
+          <p className="text-center text-xs text-gray-400 -mt-2 mb-2">
+            Free tier servers may take 30-50 seconds to wake up
+          </p>
+        )}
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
           {/* Dropzone */}
@@ -198,11 +284,11 @@ export default function Home() {
           {/* Convert Button */}
           <button
             onClick={handleConvert}
-            disabled={!file || status === 'uploading'}
+            disabled={!file || status === 'uploading' || backendStatus !== 'ready'}
             className={`
               mt-6 w-full py-4 px-6 rounded-xl font-semibold text-white
               flex items-center justify-center gap-2 transition-colors
-              ${!file || status === 'uploading'
+              ${!file || status === 'uploading' || backendStatus !== 'ready'
                 ? 'bg-gray-300 cursor-not-allowed'
                 : 'bg-indigo-600 hover:bg-indigo-700'
               }
@@ -212,6 +298,16 @@ export default function Home() {
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
                 Converting...
+              </>
+            ) : backendStatus === 'warming' ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Waiting for server...
+              </>
+            ) : backendStatus !== 'ready' ? (
+              <>
+                <AlertCircle className="w-5 h-5" />
+                Server not ready
               </>
             ) : (
               <>
