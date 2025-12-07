@@ -1,0 +1,9 @@
+# Render Blueprint for backend deployment
+services:
+  - type: web
+    name: notebook-converter-api
+    env: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: FRONTEND_URL
+        value: https://your-frontend-url.vercel.app
